@@ -165,6 +165,21 @@ app-filetransfer/
 │   │       ├── ShareLinkView.jsx      # Public download view with expiry handler
 │   │       └── admin/
 │   │           └── AdminLayout.jsx    # Complete admin console (6 modules)
-│   └── dist/                 # Production-built bundle
-└── package.json              # Root workspace convenience scripts
 ```
+
+---
+
+## 📱 Build APK Android Asli (Capacitor)
+
+Proyek ini telah dikonfigurasi dengan **Capacitor Native Android**:
+
+1. **Buka Project di Android Studio**:
+   ```bash
+   cd client
+   npx cap open android
+   ```
+2. **Build APK**:
+   - Di Android Studio, klik menu **Build** > **Build Bundle(s) / APK(s)** > **Build APK(s)**.
+   - APK akan selesai di-generate di folder `client/android/app/build/outputs/apk/debug/app-debug.apk`.
+   - File APK ini dapat langsung Anda install di smartphone Android mana saja!
+
