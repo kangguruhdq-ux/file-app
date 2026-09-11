@@ -10,6 +10,7 @@ import QRModal from '../components/QRModal';
 import QRScannerModal from '../components/QRScannerModal';
 import TransferMethodSelector, { TRANSFER_METHODS } from '../components/TransferMethodSelector';
 import FlightTransferAnimation from '../components/FlightTransferAnimation';
+import DevicePermissionModal, { getStoredPermission, saveStoredPermission } from '../components/DevicePermissionModal';
 
 export default function TransferScreen() {
   const { user, token } = useAuth();
@@ -41,6 +42,26 @@ export default function TransferScreen() {
   const [historyFilter, setHistoryFilter] = useState('all');
   const [expandedHistoryId, setExpandedHistoryId] = useState(null);
   const [pairingInput, setPairingInput] = useState('');
+
+  // Device Permission Modal state
+  const [permissionModalType, setPermissionModalType] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+
+  const executeWithPermission = (permType, actionFn) => {
+    if (getStoredPermission(permType)) {
+      actionFn();
+    } else {
+      setPermissionModalType(permType);
+      setPendingAction(() => actionFn);
+    }
+  };
+
+  const handlePermissionGranted = () => {
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  };
 
   // NFC / Shake simulation state
   const [isShaking, setIsShaking] = useState(false);
@@ -606,7 +627,7 @@ export default function TransferScreen() {
                     SSID Otomatis: <strong className="font-mono">DIRECT-FT-{user?.name || 'Florian'}</strong> (Kecepatan hingga 40 MB/s)
                   </p>
                   <button
-                    onClick={() => handleTriggerTransfer()}
+                    onClick={() => executeWithPermission('wifi', () => handleTriggerTransfer())}
                     className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95"
                   >
                     <Zap size={14} />
@@ -629,7 +650,7 @@ export default function TransferScreen() {
                     Data dikirim langsung antar perangkat tanpa tersimpan di server relay cloud.
                   </p>
                   <button
-                    onClick={() => handleTriggerTransfer()}
+                    onClick={() => executeWithPermission('location_nearby', () => handleTriggerTransfer())}
                     className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95"
                   >
                     <ShieldCheck size={14} />
@@ -666,7 +687,7 @@ export default function TransferScreen() {
                     </button>
                   </div>
                   <button
-                    onClick={() => handleTriggerTransfer()}
+                    onClick={() => executeWithPermission('storage', () => handleTriggerTransfer())}
                     className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95"
                   >
                     <Link2 size={14} />
@@ -688,7 +709,7 @@ export default function TransferScreen() {
                     Tekan tombol di bawah untuk menyimulasikan sensor getar & beam NFC.
                   </p>
                   <button
-                    onClick={handleSimulateShake}
+                    onClick={() => executeWithPermission('motion_sensors', () => handleSimulateShake())}
                     disabled={isShaking}
                     className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1.5"
                   >
@@ -755,7 +776,7 @@ export default function TransferScreen() {
 
                 <div className="flex gap-2 pt-1">
                   <button
-                    onClick={() => setIsScannerOpen(true)}
+                    onClick={() => executeWithPermission('camera', () => setIsScannerOpen(true))}
                     className="flex-1 py-3 bg-sky-500 hover:bg-sky-600 text-white dark:bg-sky-500 dark:hover:bg-sky-400 dark:text-slate-950 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 shadow-md"
                   >
                     <QrCode size={16} />
@@ -779,14 +800,17 @@ export default function TransferScreen() {
                   <input
                     type="text"
                     maxLength={6}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={pairingInput}
                     onChange={(e) => setPairingInput(e.target.value.replace(/[^0-9]/g, ''))}
                     placeholder="Contoh: 482910"
-                    className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center font-mono font-black text-sm tracking-widest focus:outline-none focus:border-sky-500"
+                    className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center font-mono font-black text-sm tracking-widest text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                   />
                   <button
                     type="submit"
-                    className="px-4 py-2.5 bg-slate-900 dark:bg-sky-500 text-white dark:text-slate-950 rounded-xl text-xs font-bold active:scale-95 shadow-sm"
+                    disabled={pairingInput.length < 4}
+                    className="px-4 py-2.5 bg-slate-900 dark:bg-sky-500 disabled:opacity-40 text-white dark:text-slate-950 rounded-xl text-xs font-bold active:scale-95 shadow-sm transition-all"
                   >
                     Hubungkan
                   </button>
@@ -1024,6 +1048,13 @@ export default function TransferScreen() {
       <QRScannerModal
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
+      />
+
+      <DevicePermissionModal
+        isOpen={!!permissionModalType}
+        onClose={() => setPermissionModalType(null)}
+        permissionType={permissionModalType}
+        onGranted={handlePermissionGranted}
       />
     </div>
   );
