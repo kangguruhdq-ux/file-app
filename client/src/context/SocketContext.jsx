@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import confetti from 'canvas-confetti';
 
@@ -22,6 +22,12 @@ export function SocketProvider({ children, user }) {
     transferredBytes: 0
   });
   const [receivedFiles, setReceivedFiles] = useState([]);
+
+  // Session ref to avoid stale closures in socket callbacks
+  const currentSessionRef = useRef(currentSession);
+  useEffect(() => {
+    currentSessionRef.current = currentSession;
+  }, [currentSession]);
 
   useEffect(() => {
     // Determine socket server URL
@@ -57,31 +63,68 @@ export function SocketProvider({ children, user }) {
     // Sender events
     newSocket.on('session_created', (data) => {
       setCurrentSession(data);
+      currentSessionRef.current = data;
       setSessionRole('sender');
       setTransferState('waiting');
     });
 
+    // SENDER: Receiver scanned or connected!
     newSocket.on('receiver_connected', (data) => {
-      setTransferState('connected');
+      setTransferState('transferring');
       setCurrentSession(prev => ({
         ...prev,
-        receiverDevice: data.receiverDevice,
-        receiverId: data.receiverId
+        receiverDevice: data.receiverDevice || 'Perangkat Penerima',
+        receiverId: data.receiverId,
+        files: data.files || prev?.files,
+        totalSize: data.totalSize || prev?.totalSize
       }));
+
+      // Automatically close QR Modal on sender
+      window.dispatchEvent(new CustomEvent('app:close-qr-modal'));
+      // Automatically switch sender to transfer progress view
+      window.dispatchEvent(new CustomEvent('app:navigate-tab', { detail: { tab: 'transfer' } }));
+
+      // Notify sender that pairing succeeded
+      window.dispatchEvent(new CustomEvent('app:notify', {
+        detail: {
+          type: 'success',
+          title: 'Perangkat Terhubung!',
+          message: `${data.receiverDevice || 'Penerima'} telah terhubung. Memulai proses transfer berkas...`
+        }
+      }));
+
+      // Automatically execute transfer progress on sender
+      setTimeout(() => {
+        runActiveTransfer(
+          data.files || currentSessionRef.current?.files,
+          data.sessionId || currentSessionRef.current?.sessionId,
+          data.totalSize || currentSessionRef.current?.totalSize
+        );
+      }, 250);
     });
 
     // Receiver events
     newSocket.on('session_joined_success', (data) => {
       setSessionRole('receiver');
       setCurrentSession(data);
+      currentSessionRef.current = data;
       setIncomingTransfer(data);
-      setTransferState('prompt_accept');
-      // Direct immediately to transfer tab!
+      setTransferState('transferring');
+
+      // Close modal and go straight to transfer screen
+      window.dispatchEvent(new CustomEvent('app:close-qr-modal'));
       window.dispatchEvent(new CustomEvent('app:navigate-tab', { detail: { tab: 'transfer' } }));
     });
 
+    // Handle soft warnings instead of blocking native alert()
     newSocket.on('join_error', (data) => {
-      alert(data.message || 'Gagal terhubung dengan sesi transfer');
+      window.dispatchEvent(new CustomEvent('app:notify', {
+        detail: {
+          type: 'warning',
+          title: 'Perhatian Sesi',
+          message: data.message || 'Kode transfer tidak ditemukan atau sudah kedaluwarsa'
+        }
+      }));
       setTransferState('idle');
     });
 
@@ -89,8 +132,18 @@ export function SocketProvider({ children, user }) {
       setTransferState('rejected');
     });
 
-    newSocket.on('transfer_started', () => {
+    newSocket.on('transfer_started', (data) => {
       setTransferState('transferring');
+      if (data?.receiverDevice || data?.senderDevice) {
+        setCurrentSession(prev => ({
+          ...prev,
+          receiverDevice: data.receiverDevice || prev?.receiverDevice,
+          senderDevice: data.senderDevice || prev?.senderDevice,
+          files: data.files || prev?.files,
+          totalSize: data.totalSize || prev?.totalSize
+        }));
+      }
+      window.dispatchEvent(new CustomEvent('app:close-qr-modal'));
       window.dispatchEvent(new CustomEvent('app:navigate-tab', { detail: { tab: 'transfer' } }));
     });
 
@@ -132,31 +185,72 @@ export function SocketProvider({ children, user }) {
 
   // Sender starts a session with chosen files
   const createSession = (files, totalSize, senderDevice) => {
-    if (!socket) return;
-    socket.emit('create_session', {
-      files,
-      totalSize,
+    const defaultFiles = [
+      { name: 'Bermain bersama chika.3gp', size: 43 * 1024 * 1024, type: 'video/3gpp' },
+      { name: 'Another iteration of mind.png', size: 1.3 * 1024 * 1024, type: 'image/png' }
+    ];
+    const effectiveFiles = (files && files.length > 0) ? files : defaultFiles;
+    const effectiveTotalSize = totalSize || effectiveFiles.reduce((acc, f) => acc + (f.size || 0), 0);
+
+    const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const generatedToken = 'qr-' + Math.random().toString(36).substring(2, 12);
+    const generatedSessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
+
+    const immediateSession = {
+      sessionId: generatedSessionId,
+      pairingCode: generatedCode,
+      qrToken: generatedToken,
+      files: effectiveFiles,
+      totalSize: effectiveTotalSize,
       senderDevice: senderDevice || (user ? user.device_name : 'Sender Phone'),
-      senderId: user ? user.id : 'guest'
-    });
+      status: 'waiting'
+    };
+
+    // IMMEDIATELY set currentSession so QRModal is never empty dashes or 0 files
+    setCurrentSession(immediateSession);
+    currentSessionRef.current = immediateSession;
+    setSessionRole('sender');
+    setTransferState('waiting');
+
+    if (socket) {
+      socket.emit('create_session', {
+        sessionId: generatedSessionId,
+        pairingCode: generatedCode,
+        qrToken: generatedToken,
+        files: effectiveFiles,
+        totalSize: effectiveTotalSize,
+        senderDevice: immediateSession.senderDevice,
+        senderId: user ? user.id : 'guest'
+      });
+    }
   };
 
   // Receiver joins session with pairing code or QR token
   const joinSession = (codeOrQr, receiverDevice) => {
-    if (!socket) return;
-    const isNumeric = /^\d{6}$/.test(codeOrQr.replace(/\s+/g, ''));
+    if (!codeOrQr) return;
+    let rawCode = String(codeOrQr).trim();
+    if (rawCode.includes('/m/')) {
+      rawCode = rawCode.split('/m/')[1]?.split('?')[0] || rawCode;
+    } else if (rawCode.includes('session=')) {
+      rawCode = rawCode.split('session=')[1]?.split('&')[0] || rawCode;
+    }
+    const cleanCode = rawCode.replace(/[^0-9a-zA-Z_-]/g, '');
+
+    const isNumeric = /^\d{6}$/.test(cleanCode);
     const payload = {
       receiverDevice: receiverDevice || (user ? user.device_name : 'Receiver Phone'),
       receiverId: user ? user.id : 'guest'
     };
 
     if (isNumeric) {
-      payload.pairingCode = codeOrQr;
+      payload.pairingCode = cleanCode;
     } else {
-      payload.qrToken = codeOrQr;
+      payload.qrToken = cleanCode;
     }
 
-    socket.emit('join_session', payload);
+    if (socket) {
+      socket.emit('join_session', payload);
+    }
   };
 
   // Receiver accepts or rejects

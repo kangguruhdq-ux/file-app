@@ -88,6 +88,14 @@ export default function TransferScreen() {
     }
   }, [transferState]);
 
+  // Automatically close any open modals when transfer begins
+  useEffect(() => {
+    if (transferState === 'transferring' || transferState === 'completed') {
+      setIsQRModalOpen(false);
+      setIsScannerOpen(false);
+    }
+  }, [transferState]);
+
   const fetchHistory = async () => {
     try {
       const url = historyFilter === 'all'
@@ -1043,6 +1051,10 @@ export default function TransferScreen() {
         totalFiles={currentSession?.files?.length || 0}
         totalSize={currentSession?.totalSize || 0}
         senderDevice={user?.device_name}
+        onStartTransfer={() => {
+          setIsQRModalOpen(false);
+          handleTriggerTransfer();
+        }}
       />
 
       <QRScannerModal

@@ -1,10 +1,20 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
 
 const NotificationContext = createContext(null);
 
 export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    const handleCustomNotify = (e) => {
+      if (e.detail) {
+        addNotification(e.detail);
+      }
+    };
+    window.addEventListener('app:notify', handleCustomNotify);
+    return () => window.removeEventListener('app:notify', handleCustomNotify);
+  }, []);
 
   const addNotification = ({ type = 'info', title, message, duration = 3200 }) => {
     const id = 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);

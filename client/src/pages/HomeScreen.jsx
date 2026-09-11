@@ -12,7 +12,7 @@ import FilePreviewModal from '../components/FilePreviewModal';
 
 export default function HomeScreen({ onNavigateTab, onOpenCS }) {
   const { user, token } = useAuth();
-  const { createSession, currentSession, resetTransfer, runActiveTransfer } = useSocket();
+  const { createSession, currentSession, resetTransfer, runActiveTransfer, transferState } = useSocket();
   const { t, lang } = useLanguage();
   const { isDark } = useTheme();
   const { notifySuccess, notifyError } = useNotification();
@@ -23,6 +23,14 @@ export default function HomeScreen({ onNavigateTab, onOpenCS }) {
   const [selectedFileForPreview, setSelectedFileForPreview] = useState(null);
   const [recentItems, setRecentItems] = useState([]);
   const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+
+  // Auto-close modals when transfer process begins
+  useEffect(() => {
+    if (transferState === 'transferring' || transferState === 'completed') {
+      setIsQRModalOpen(false);
+      setIsScannerOpen(false);
+    }
+  }, [transferState]);
 
   useEffect(() => {
     fetchRecentFiles();

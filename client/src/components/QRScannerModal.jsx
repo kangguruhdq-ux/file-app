@@ -216,6 +216,7 @@ export default function QRScannerModal({ isOpen, onClose }) {
     joinSession(cleanCode);
 
     // Ensure user is navigated directly to transfer screen with active transfer
+    window.dispatchEvent(new CustomEvent('app:close-qr-modal'));
     window.dispatchEvent(new CustomEvent('app:navigate-tab', { detail: { tab: 'transfer' } }));
     onClose();
 
