@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, Image, Video, Music, FileText, Smartphone, Archive, Plus, CheckCircle2, HardDriveUpload, Check, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
   const { token } = useAuth();
+  const { isDark } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [customStorageFiles, setCustomStorageFiles] = useState([]);
@@ -215,20 +217,24 @@ export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 relative flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn select-none">
+      <div className={`w-full max-w-md rounded-3xl p-6 shadow-2xl border relative flex flex-col max-h-[85vh] transition-all ${
+        isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+      }`}>
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
+          className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+            isDark ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+          }`}
         >
           <X size={18} />
         </button>
 
         {/* Title */}
         <div className="text-left mb-4">
-          <h3 className="text-lg font-bold text-slate-900">Select Files to Send</h3>
-          <p className="text-xs text-slate-500">Pick from device storage or choose presets</p>
+          <h3 className="text-lg font-black tracking-tight">Select Files to Send</h3>
+          <p className="text-xs text-slate-400">Pick from device storage or choose presets</p>
         </div>
 
         {/* Categories Bar */}
@@ -240,9 +246,11 @@ export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 ${
                   isSelected
-                    ? 'bg-slate-900 text-white shadow-sm'
+                    ? 'bg-sky-500 text-white shadow-sm'
+                    : isDark
+                    ? 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
@@ -254,7 +262,11 @@ export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
         </div>
 
         {/* Device File Picker Input */}
-        <label className="flex items-center justify-center gap-2 p-3 mb-3 border-2 border-dashed border-sky-300 bg-sky-50/50 hover:bg-sky-50 rounded-2xl cursor-pointer text-sky-700 transition-colors text-xs font-semibold">
+        <label className={`flex items-center justify-center gap-2 p-3 mb-3 border-2 border-dashed rounded-2xl cursor-pointer transition-colors text-xs font-bold ${
+          isDark
+            ? 'border-sky-700/80 bg-sky-950/30 hover:bg-sky-950/50 text-sky-400'
+            : 'border-sky-300 bg-sky-50/60 hover:bg-sky-100 text-sky-700'
+        }`}>
           <HardDriveUpload size={16} />
           <span>Browse Files from This Device</span>
           <input
@@ -271,11 +283,11 @@ export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
           {customStorageFiles.length > 0 && (
             <div className="space-y-1.5 mb-2">
               <div className="flex items-center justify-between px-1">
-                <span className="text-[10px] font-extrabold text-sky-600 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-[10px] font-extrabold text-sky-500 uppercase tracking-wider flex items-center gap-1.5">
                   <HardDriveUpload size={13} />
                   <span>File dari Penyimpanan HP ({customStorageFiles.length})</span>
                 </span>
-                <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md">
+                <span className="text-[9px] font-bold bg-emerald-500/15 text-emerald-500 px-1.5 py-0.5 rounded-md">
                   Auto-Selected
                 </span>
               </div>
@@ -287,7 +299,11 @@ export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
                     onClick={() => toggleFile(file)}
                     className={`flex items-center justify-between p-2.5 rounded-2xl border cursor-pointer transition-all ${
                       isSelected
-                        ? 'bg-sky-50/90 border-sky-400 shadow-sm'
+                        ? isDark
+                          ? 'bg-sky-950/60 border-sky-500 shadow-sm'
+                          : 'bg-sky-50/90 border-sky-400 shadow-sm'
+                        : isDark
+                        ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
                         : 'bg-white border-slate-100 hover:border-slate-200'
                     }`}
                   >
@@ -296,20 +312,20 @@ export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
                         <HardDriveUpload size={18} />
                       </div>
                       <div className="truncate">
-                        <p className="text-xs font-bold text-slate-800 truncate">{file.name}</p>
+                        <p className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{file.name}</p>
                         <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
                           <span>{formatBytes(file.size)}</span>
                           <span>•</span>
-                          <span className="text-sky-600 font-semibold">Storage HP</span>
+                          <span className="text-sky-500 font-semibold">Storage HP</span>
                         </p>
                       </div>
                     </div>
 
                     <div className="ml-2 shrink-0">
                       {isSelected ? (
-                        <CheckCircle2 size={20} className="text-sky-500 fill-sky-100" />
+                        <CheckCircle2 size={20} className="text-sky-500 fill-sky-500/20" />
                       ) : (
-                        <div className="w-5 h-5 rounded-full border-2 border-slate-300"></div>
+                        <div className={`w-5 h-5 rounded-full border-2 ${isDark ? 'border-slate-700' : 'border-slate-300'}`}></div>
                       )}
                     </div>
                   </div>
@@ -333,7 +349,11 @@ export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
                   onClick={() => toggleFile(file)}
                   className={`flex items-center justify-between p-2.5 rounded-2xl border cursor-pointer transition-all ${
                     isSelected
-                      ? 'bg-sky-50/90 border-sky-400 shadow-sm'
+                      ? isDark
+                        ? 'bg-sky-950/60 border-sky-500 shadow-sm'
+                        : 'bg-sky-50/90 border-sky-400 shadow-sm'
+                      : isDark
+                      ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
                       : 'bg-white border-slate-100 hover:border-slate-200'
                   }`}
                 >
@@ -349,13 +369,13 @@ export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
                       {file.category === 'zip' && <Archive size={18} />}
                     </div>
                     <div className="truncate">
-                      <p className="text-xs font-semibold text-slate-800 truncate">{file.name}</p>
+                      <p className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{file.name}</p>
                       <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
                         <span>{formatBytes(file.size)}</span>
                         <span>•</span>
-                        <span>{file.category}</span>
+                        <span className="capitalize">{file.category}</span>
                         {file.isFromCloud && (
-                          <span className="text-indigo-600 font-semibold text-[10px]">Cloud</span>
+                          <span className="text-sky-500 font-semibold text-[10px]">Cloud</span>
                         )}
                       </p>
                     </div>
@@ -363,9 +383,9 @@ export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
 
                   <div className="ml-2 shrink-0">
                     {isSelected ? (
-                      <CheckCircle2 size={20} className="text-sky-500 fill-sky-100" />
+                      <CheckCircle2 size={20} className="text-sky-500 fill-sky-500/20" />
                     ) : (
-                      <div className="w-5 h-5 rounded-full border-2 border-slate-300"></div>
+                      <div className={`w-5 h-5 rounded-full border-2 ${isDark ? 'border-slate-700' : 'border-slate-300'}`}></div>
                     )}
                   </div>
                 </div>
@@ -375,18 +395,20 @@ export default function FilePickerModal({ isOpen, onClose, onFilesSelected }) {
         </div>
 
         {/* Footer Summary & Confirm Button */}
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+        <div className={`pt-3 border-t flex items-center justify-between gap-3 ${
+          isDark ? 'border-slate-800' : 'border-slate-100'
+        }`}>
           <div>
-            <span className="text-xs font-semibold text-slate-800 block">
+            <span className={`text-xs font-bold block ${isDark ? 'text-white' : 'text-slate-800'}`}>
               {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected
             </span>
-            <span className="text-[11px] text-slate-400">{formatBytes(totalSize)}</span>
+            <span className="text-[11px] text-slate-400 font-mono">{formatBytes(totalSize)}</span>
           </div>
 
           <button
             onClick={handleConfirm}
             disabled={selectedFiles.length === 0}
-            className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-xl text-xs font-semibold shadow-md transition-all"
+            className="px-6 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 disabled:opacity-40 text-white rounded-xl text-xs font-black shadow-md shadow-sky-500/20 transition-all active:scale-95"
           >
             Confirm & Send
           </button>
