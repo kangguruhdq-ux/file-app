@@ -23,29 +23,25 @@ export default function QRScannerModal({ isOpen, onClose }) {
   const canvasRef = useRef(null);
   const galleryInputRef = useRef(null);
   const animationFrameRef = useRef(null);
-
-  // Stop camera when modal closes or mode changes
-  useEffect(() => {
-    if (!isOpen || activeMode !== 'scan') {
-      stopCamera();
-    } else if (isOpen && activeMode === 'scan') {
-      startCamera();
-    }
-
-    return () => {
-      stopCamera();
-    };
-  }, [isOpen, activeMode, facingMode]);
+  const streamRef = useRef(null);
 
   const stopCamera = () => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      setCameraStream(null);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (e) {}
+      });
+      streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraStream(null);
     setIsCameraActive(false);
   };
 
@@ -59,30 +55,63 @@ export default function QRScannerModal({ isOpen, onClose }) {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: facingMode,
-          width: { ideal: 640 },
-          height: { ideal: 640 }
-        },
-        audio: false
-      });
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 640 },
+            height: { ideal: 640 }
+          },
+          audio: false
+        });
+      } catch (err1) {
+        console.warn('FacingMode ideal failed, falling back to basic video:', err1);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
 
+      streamRef.current = stream;
       setCameraStream(stream);
       setIsCameraActive(true);
       saveStoredPermission('camera', true);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play().catch(() => {});
-        startQrScanning();
-      }
     } catch (err) {
       console.warn('Camera access denied or error:', err);
       setCameraError('Izin akses kamera ditolak atau kamera sedang digunakan aplikasi lain.');
       setIsCameraActive(false);
     }
   };
+
+  // Bind video element whenever cameraStream updates
+  useEffect(() => {
+    if (cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.setAttribute('playsinline', 'true');
+      videoRef.current
+        .play()
+        .then(() => {
+          startQrScanning();
+        })
+        .catch((err) => {
+          console.warn('Video play warning:', err);
+        });
+    }
+  }, [cameraStream]);
+
+  // Stop camera when modal closes or mode changes
+  useEffect(() => {
+    if (!isOpen || activeMode !== 'scan') {
+      stopCamera();
+    } else if (isOpen && activeMode === 'scan') {
+      startCamera();
+    }
+
+    return () => {
+      stopCamera();
+    };
+  }, [isOpen, activeMode, facingMode]);
 
   const toggleFacingMode = () => {
     setFacingMode(prev => (prev === 'environment' ? 'user' : 'environment'));
@@ -369,16 +398,19 @@ export default function QRScannerModal({ isOpen, onClose }) {
           <div className="space-y-3 text-center">
             {/* Camera Viewport */}
             <div className="relative w-56 h-56 mx-auto bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-700 flex items-center justify-center shadow-inner">
-              {isCameraActive ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="p-4 text-center space-y-2">
+              {/* Video is always mounted so videoRef is always available */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover transition-opacity duration-300 ${
+                  isCameraActive ? 'opacity-100' : 'opacity-0 pointer-events-none absolute inset-0'
+                }`}
+              />
+
+              {!isCameraActive && (
+                <div className="p-4 text-center space-y-2 z-10">
                   <Camera size={32} className="text-slate-500 mx-auto animate-pulse" />
                   <p className="text-[11px] text-slate-400 leading-snug">
                     {cameraError || 'Kamera belum dinyalakan atau izin belum diberikan.'}
@@ -386,7 +418,7 @@ export default function QRScannerModal({ isOpen, onClose }) {
                   <button
                     type="button"
                     onClick={startCamera}
-                    className="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-white rounded-xl text-[11px] font-bold shadow-sm"
+                    className="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-white rounded-xl text-[11px] font-bold shadow-sm active:scale-95 transition-all"
                   >
                     Izinkan & Nyalakan Kamera
                   </button>
