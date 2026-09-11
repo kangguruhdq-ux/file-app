@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FileTransfer</string>
+    <string name="title_activity_main">FileTransfer</string>
+    <string name="package_name">com.kangguru.filetransfer</string>
+    <string name="custom_url_scheme">com.kangguru.filetransfer</string>
+</resources>
