@@ -1,0 +1,12 @@
+{
+  "name": "file-transfer-app",
+  "version": "1.0.0",
+  "description": "SHAREit-style Mobile File Transfer App with Cloud Storage, Pricing, and Admin Dashboard",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "start": "node server/src/index.js",
+    "build": "npm --prefix client run build"
+  }
+}
