@@ -401,9 +401,11 @@ export default function HomeScreen({ onNavigateTab, onOpenCS }) {
 
       <QRModal
         isOpen={isQRModalOpen}
-        onClose={() => {
+        onClose={(isAutoClose) => {
           setIsQRModalOpen(false);
-          resetTransfer();
+          if (!isAutoClose && transferState !== 'transferring' && transferState !== 'completed') {
+            resetTransfer();
+          }
         }}
         pairingCode={currentSession?.pairingCode}
         qrToken={currentSession?.qrToken}

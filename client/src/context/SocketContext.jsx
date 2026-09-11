@@ -30,8 +30,11 @@ export function SocketProvider({ children, user }) {
   }, [currentSession]);
 
   useEffect(() => {
-    // Determine socket server URL
-    const socketUrl = window.location.origin;
+    // Determine socket server URL (direct to port 5000 if on dev server 5173)
+    const socketUrl = (window.location.port === '5173')
+      ? `${window.location.protocol}//${window.location.hostname}:5000`
+      : window.location.origin;
+
     const newSocket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true
@@ -100,7 +103,7 @@ export function SocketProvider({ children, user }) {
           data.sessionId || currentSessionRef.current?.sessionId,
           data.totalSize || currentSessionRef.current?.totalSize
         );
-      }, 250);
+      }, 200);
     });
 
     // Receiver events
@@ -114,6 +117,36 @@ export function SocketProvider({ children, user }) {
       // Close modal and go straight to transfer screen
       window.dispatchEvent(new CustomEvent('app:close-qr-modal'));
       window.dispatchEvent(new CustomEvent('app:navigate-tab', { detail: { tab: 'transfer' } }));
+    });
+
+    // Broadcast event across all open tabs/devices when any session launches transfer
+    newSocket.on('active_transfer_launched', (data) => {
+      if (
+        sessionRole === 'sender' ||
+        transferState === 'waiting' ||
+        (currentSessionRef.current && (
+          currentSessionRef.current.pairingCode === data.pairingCode ||
+          currentSessionRef.current.sessionId === data.sessionId
+        ))
+      ) {
+        setTransferState('transferring');
+        setCurrentSession(prev => ({
+          ...prev,
+          receiverDevice: data.receiverDevice || 'Perangkat Penerima',
+          files: (data.files && data.files.length > 0) ? data.files : prev?.files,
+          totalSize: data.totalSize || prev?.totalSize
+        }));
+        window.dispatchEvent(new CustomEvent('app:close-qr-modal'));
+        window.dispatchEvent(new CustomEvent('app:navigate-tab', { detail: { tab: 'transfer' } }));
+
+        setTimeout(() => {
+          runActiveTransfer(
+            data.files || currentSessionRef.current?.files,
+            data.sessionId || currentSessionRef.current?.sessionId,
+            data.totalSize || currentSessionRef.current?.totalSize
+          );
+        }, 200);
+      }
     });
 
     // Handle soft warnings instead of blocking native alert()
@@ -145,6 +178,17 @@ export function SocketProvider({ children, user }) {
       }
       window.dispatchEvent(new CustomEvent('app:close-qr-modal'));
       window.dispatchEvent(new CustomEvent('app:navigate-tab', { detail: { tab: 'transfer' } }));
+
+      // If we are sender, start flight progress if not already running
+      if (sessionRole === 'sender' || transferState === 'waiting') {
+        setTimeout(() => {
+          runActiveTransfer(
+            data.files || currentSessionRef.current?.files,
+            data.sessionId || currentSessionRef.current?.sessionId,
+            data.totalSize || currentSessionRef.current?.totalSize
+          );
+        }, 200);
+      }
     });
 
     newSocket.on('transfer_progress', (data) => {

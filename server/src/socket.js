@@ -196,10 +196,21 @@ function setupSocketIO(io, dbPromise) {
         console.error('Error updating transfer session:', err);
       }
 
-      // Notify sender that receiver connected AND start transfer immediately!
+      // If session.senderSocketId is missing, associate with another connected client socket
+      if (!session.senderSocketId) {
+        for (const [sId, dev] of connectedDevices.entries()) {
+          if (sId !== socket.id) {
+            session.senderSocketId = sId;
+            break;
+          }
+        }
+      }
+
+      // Notify sender directly
       if (session.senderSocketId) {
         io.to(session.senderSocketId).emit('receiver_connected', {
           sessionId,
+          pairingCode: session.pairingCode,
           receiverDevice: session.receiverDevice,
           receiverId: session.receiverId,
           files: session.files,
@@ -207,12 +218,33 @@ function setupSocketIO(io, dbPromise) {
         });
         io.to(session.senderSocketId).emit('transfer_started', {
           sessionId,
+          pairingCode: session.pairingCode,
           files: session.files,
           totalSize: session.totalSize,
           receiverDevice: session.receiverDevice,
           senderDevice: session.senderDevice
         });
       }
+
+      // Also emit to the room (both devices)
+      io.to(sessionId).emit('transfer_started', {
+        sessionId,
+        pairingCode: session.pairingCode,
+        files: session.files,
+        totalSize: session.totalSize,
+        receiverDevice: session.receiverDevice,
+        senderDevice: session.senderDevice
+      });
+
+      // Broadcast to any other open windows/tabs so sender UI instantly updates
+      socket.broadcast.emit('active_transfer_launched', {
+        sessionId,
+        pairingCode: session.pairingCode,
+        receiverDevice: session.receiverDevice,
+        senderDevice: session.senderDevice,
+        files: session.files,
+        totalSize: session.totalSize
+      });
 
       // Notify receiver with session and start transfer!
       socket.emit('session_joined_success', {

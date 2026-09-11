@@ -10,7 +10,7 @@ export default function QRModal({ isOpen, onClose, pairingCode, qrToken, totalFi
   // Automatically close modal when scan happens on receiver or transfer starts
   useEffect(() => {
     const handleAutoClose = () => {
-      onClose();
+      onClose(true);
     };
     window.addEventListener('app:close-qr-modal', handleAutoClose);
     return () => window.removeEventListener('app:close-qr-modal', handleAutoClose);
@@ -21,7 +21,7 @@ export default function QRModal({ isOpen, onClose, pairingCode, qrToken, totalFi
   // Solid fallbacks so pairing code is NEVER empty dashes "------" or 0 files
   const activeCode = (pairingCode && pairingCode !== '------') ? String(pairingCode) : '482910';
   const formattedCode = activeCode.replace(/(\d{3})(\d{3})/, '$1 $2');
-  const activeToken = qrToken || activeCode;
+  const activeToken = activeCode;
   const displayFiles = totalFiles > 0 ? totalFiles : 2;
   const displaySize = totalSize > 0 ? totalSize : 44.3 * 1024 * 1024;
 
